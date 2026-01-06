@@ -152,6 +152,7 @@ export default function RelationshipNetworkApp() {
               showLinks={showLinks}
               onSelectPerson={handleSelectPerson}
               onSelectRelationship={handleSelectRelationship}
+              onCreateRelationship={handleAddRelationship}
             />
           </div>
         </div>
@@ -186,8 +187,8 @@ export default function RelationshipNetworkApp() {
       {/* Footer hint */}
       <footer className="flex-shrink-0 border-t border-border bg-card px-6 py-3">
         <p className="text-xs text-muted-foreground text-center">
-          Click a node to view all relationships • Click a link to see events for that relationship • Toggle links
-          visibility in the header
+          Click a node to view only its relationships • Right-click a node, then click another to create a relationship
+          • Click a link to see events
         </p>
       </footer>
     </div>

@@ -3,6 +3,24 @@
 import { useRef, useCallback, useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import type { Person, Relationship } from "@/lib/types"
+import { RELATIONSHIP_TYPES } from "@/lib/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false })
 
@@ -26,6 +44,7 @@ interface NetworkGraphProps {
   showLinks: boolean
   onSelectPerson: (id: string | null) => void
   onSelectRelationship: (id: string | null) => void
+  onCreateRelationship: (person1Id: string, person2Id: string, type: string) => void
 }
 
 export function NetworkGraph({
@@ -36,11 +55,25 @@ export function NetworkGraph({
   showLinks,
   onSelectPerson,
   onSelectRelationship,
+  onCreateRelationship,
 }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<any>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map())
+
+  // Drag-to-create relationship state
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean
+    startNodeId: string | null
+    currentPos: { x: number; y: number } | null
+  }>({ isDragging: false, startNodeId: null, currentPos: null })
+  const [showRelationshipDialog, setShowRelationshipDialog] = useState(false)
+  const [pendingRelationship, setPendingRelationship] = useState<{
+    person1Id: string
+    person2Id: string
+  } | null>(null)
+  const [selectedRelationType, setSelectedRelationType] = useState<string>(RELATIONSHIP_TYPES[0])
 
   const getHealthColor = (score: number): string => {
     if (score >= 60) return "#22c55e"
@@ -162,6 +195,61 @@ export function NetworkGraph({
     onSelectRelationship(null)
   }, [onSelectPerson, onSelectRelationship])
 
+  const handleNodeRightClick = useCallback((node: any) => {
+    // Right-click to start creating a relationship
+    setDragState({
+      isDragging: true,
+      startNodeId: node.id,
+      currentPos: { x: node.x, y: node.y }
+    })
+  }, [])
+
+  const handleNodeClickForRelationship = useCallback((node: any) => {
+    // If we're in drag mode and click a different node, create relationship
+    if (dragState.isDragging && dragState.startNodeId && dragState.startNodeId !== node.id) {
+      // Check if relationship already exists
+      const existingRel = relationships.find(
+        r => (r.person1Id === dragState.startNodeId && r.person2Id === node.id) ||
+          (r.person1Id === node.id && r.person2Id === dragState.startNodeId)
+      )
+
+      if (!existingRel) {
+        // Show dialog to select relationship type
+        setPendingRelationship({
+          person1Id: dragState.startNodeId,
+          person2Id: node.id
+        })
+        setShowRelationshipDialog(true)
+      }
+      setDragState({ isDragging: false, startNodeId: null, currentPos: null })
+      return
+    }
+
+    // Normal node click behavior
+    console.log("[v0] Node clicked:", node.id)
+    onSelectRelationship(null)
+    onSelectPerson(node.id)
+  }, [dragState.isDragging, dragState.startNodeId, relationships, onSelectPerson, onSelectRelationship])
+
+  const handleCreateRelationship = useCallback(() => {
+    if (pendingRelationship) {
+      onCreateRelationship(
+        pendingRelationship.person1Id,
+        pendingRelationship.person2Id,
+        selectedRelationType
+      )
+      setShowRelationshipDialog(false)
+      setPendingRelationship(null)
+      setSelectedRelationType(RELATIONSHIP_TYPES[0])
+    }
+  }, [pendingRelationship, selectedRelationType, onCreateRelationship])
+
+  const handleCancelRelationship = useCallback(() => {
+    setShowRelationshipDialog(false)
+    setPendingRelationship(null)
+    setSelectedRelationType(RELATIONSHIP_TYPES[0])
+  }, [])
+
   const nodeCanvasObject = useCallback(
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       if (node.x === undefined || node.y === undefined) return
@@ -211,7 +299,17 @@ export function NetworkGraph({
     [getNodeColor, isNodeSelected],
   )
 
-  const visibleLinks = showLinks ? graphData.links : []
+  // Filter links based on selection: if a node is selected, show only its links
+  const visibleLinks = showLinks
+    ? selectedPersonId
+      ? graphData.links.filter(link =>
+        link.source === selectedPersonId ||
+        link.target === selectedPersonId ||
+        (typeof link.source === 'object' && (link.source as any).id === selectedPersonId) ||
+        (typeof link.target === 'object' && (link.target as any).id === selectedPersonId)
+      )
+      : graphData.links
+    : []
 
   if (graphData.nodes.length === 0) {
     return (
@@ -221,36 +319,87 @@ export function NetworkGraph({
     )
   }
 
+  // Get start node position for drag line
+  const startNode = dragState.startNodeId ? graphData.nodes.find(n => n.id === dragState.startNodeId) : null
+
   return (
-    <div ref={containerRef} className="w-full h-full bg-[#0f1419]">
-      <ForceGraph2D
-        ref={graphRef}
-        graphData={{ nodes: graphData.nodes, links: visibleLinks }}
-        width={dimensions.width}
-        height={dimensions.height}
-        backgroundColor="#0f1419"
-        nodeCanvasObject={nodeCanvasObject}
-        nodePointerAreaPaint={(node: any, color, ctx) => {
-          if (node.x === undefined || node.y === undefined) return
-          ctx.fillStyle = color
-          ctx.beginPath()
-          ctx.arc(node.x, node.y, 12, 0, 2 * Math.PI)
-          ctx.fill()
-        }}
-        linkColor={(link: any) => getLinkColor(link.relationshipId)}
-        linkWidth={(link: any) => getLinkWidth(link.relationshipId)}
-        linkHoverPrecision={10}
-        linkDirectionalParticles={0}
-        onNodeClick={handleNodeClick}
-        onLinkClick={handleLinkClick}
-        onBackgroundClick={handleBackgroundClick}
-        cooldownTicks={100}
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.3}
-        warmupTicks={50}
-        enableNodeDrag={true}
-        enableZoomPanInteraction={true}
-      />
-    </div>
+    <>
+      <div ref={containerRef} className="w-full h-full bg-[#0f1419] relative">
+        <ForceGraph2D
+          ref={graphRef}
+          graphData={{ nodes: graphData.nodes, links: visibleLinks }}
+          width={dimensions.width}
+          height={dimensions.height}
+          backgroundColor="#0f1419"
+          nodeCanvasObject={nodeCanvasObject}
+          nodePointerAreaPaint={(node: any, color, ctx) => {
+            if (node.x === undefined || node.y === undefined) return
+            ctx.fillStyle = color
+            ctx.beginPath()
+            ctx.arc(node.x, node.y, 12, 0, 2 * Math.PI)
+            ctx.fill()
+          }}
+          linkColor={(link: any) => getLinkColor(link.relationshipId)}
+          linkWidth={(link: any) => getLinkWidth(link.relationshipId)}
+          linkHoverPrecision={10}
+          linkDirectionalParticles={0}
+          onNodeClick={handleNodeClickForRelationship}
+          onNodeRightClick={handleNodeRightClick}
+          onLinkClick={handleLinkClick}
+          onBackgroundClick={handleBackgroundClick}
+          cooldownTicks={100}
+          d3AlphaDecay={0.02}
+          d3VelocityDecay={0.3}
+          warmupTicks={50}
+          enableNodeDrag={true}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
+        />
+      </div>
+
+      {/* Relationship Type Selection Dialog */}
+      <Dialog open={showRelationshipDialog} onOpenChange={setShowRelationshipDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Relationship</DialogTitle>
+            <DialogDescription>
+              {pendingRelationship && (
+                <>
+                  Creating relationship between{" "}
+                  <strong>{people.find(p => p.id === pendingRelationship.person1Id)?.name}</strong>
+                  {" "}and{" "}
+                  <strong>{people.find(p => p.id === pendingRelationship.person2Id)?.name}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="relationship-type">Relationship Type</Label>
+              <Select value={selectedRelationType} onValueChange={setSelectedRelationType}>
+                <SelectTrigger id="relationship-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATIONSHIP_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelRelationship}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateRelationship}>
+              Create Relationship
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
