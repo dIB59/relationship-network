@@ -1,6 +1,6 @@
 "use client"
 
-import type { Person, Relationship, RelationshipEvent } from "@/lib/types"
+import type { Person, Relationship, RelationshipEvent, NetworkEvent } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +11,7 @@ import { X, TrendingUp, TrendingDown, Minus, Trash2, Heart, Sparkles } from "luc
 interface RelationshipDetailPanelProps {
   relationship: Relationship
   people: Person[]
+  networkEvents: NetworkEvent[]
   onClose: () => void
   onAddEvent: (relationshipId: string, event: Omit<RelationshipEvent, "id">) => void
   onDeleteRelationship: (id: string) => void
@@ -19,6 +20,7 @@ interface RelationshipDetailPanelProps {
 export function RelationshipDetailPanel({
   relationship,
   people,
+  networkEvents,
   onClose,
   onAddEvent,
   onDeleteRelationship,
@@ -150,7 +152,6 @@ export function RelationshipDetailPanel({
               <p className="text-sm font-medium">Event History</p>
               <AddEventDialog relationshipId={relationship.id} onAddEvent={onAddEvent} />
             </div>
-
             {/* Events list */}
             {relationship.events.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
@@ -163,13 +164,12 @@ export function RelationshipDetailPanel({
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            event.type === "positive"
+                          className={`w-2 h-2 rounded-full ${event.type === "positive"
                               ? "bg-green-400"
                               : event.type === "negative"
                                 ? "bg-red-400"
                                 : "bg-slate-400"
-                          }`}
+                            }`}
                         />
                         <span className="text-sm font-medium">{event.category}</span>
                       </div>
@@ -206,6 +206,35 @@ export function RelationshipDetailPanel({
                     <p className="text-xs text-muted-foreground">{formatDate(event.date)}</p>
                   </div>
                 ))}
+              </div>
+            )}
+            {/* Network Events / Ripple Effects Section */}
+            {networkEvents.length > 0 && (
+              <div className="space-y-3 pt-4 border-t border-border">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <Sparkles className="h-4 w-4" />
+                  <p className="text-sm font-medium">Network Ripple Effects</p>
+                </div>
+                <div className="space-y-2">
+                  {networkEvents.slice().reverse().map((event) => {
+                    const impact = event.impacts.find(i => i.relationshipId === relationship.id);
+                    return (
+                      <div key={event.id} className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium">{event.category}</span>
+                          <Badge
+                            variant={impact && impact.impact > 0 ? "default" : impact && impact.impact < 0 ? "destructive" : "secondary"}
+                            className="text-xs bg-indigo-500/20 text-indigo-300 border-none"
+                          >
+                            {impact && impact.impact > 0 ? "+" : ""}{impact?.impact}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">{event.description}</p>
+                        <p className="text-[10px] text-muted-foreground">{formatDate(event.date)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

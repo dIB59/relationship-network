@@ -1,7 +1,8 @@
-import type { Person, Relationship, RelationshipEvent } from "./types"
+import type { Person, Relationship, RelationshipEvent, NetworkEvent } from "./types"
 
 let people: Person[] = []
 let relationships: Relationship[] = []
+let networkEvents: NetworkEvent[] = []
 
 export function getPeople(): Person[] {
   return people
@@ -9,6 +10,10 @@ export function getPeople(): Person[] {
 
 export function getRelationships(): Relationship[] {
   return relationships
+}
+
+export function getNetworkEvents(): NetworkEvent[] {
+  return networkEvents
 }
 
 export function addPerson(person: Person): void {
@@ -54,6 +59,46 @@ export function deleteRelationship(id: string): void {
 
 export function getRelationshipsForPerson(personId: string): Relationship[] {
   return relationships.filter((r) => r.person1Id === personId || r.person2Id === personId)
+}
+
+// Network event management
+export function addNetworkEvent(event: NetworkEvent): void {
+  networkEvents = [...networkEvents, event]
+
+  // Apply impacts to affected relationships
+  event.impacts.forEach(impact => {
+    const relationship = relationships.find(r => r.id === impact.relationshipId)
+    if (relationship) {
+      const newHealthScore = Math.max(-100, Math.min(100, relationship.healthScore + impact.impact))
+      relationships = relationships.map(r =>
+        r.id === impact.relationshipId
+          ? { ...r, healthScore: newHealthScore }
+          : r
+      )
+    }
+  })
+}
+
+export function deleteNetworkEvent(id: string): void {
+  networkEvents = networkEvents.filter(e => e.id !== id)
+}
+
+export function getEventsForPerson(personId: string): NetworkEvent[] {
+  return networkEvents.filter(e => e.participants.includes(personId))
+}
+
+export function getEventsForRelationship(relationshipId: string): NetworkEvent[] {
+  return networkEvents.filter(e =>
+    e.impacts.some(impact => impact.relationshipId === relationshipId)
+  )
+}
+
+// Helper to find relationship between two people
+export function findRelationship(person1Id: string, person2Id: string): Relationship | undefined {
+  return relationships.find(
+    r => (r.person1Id === person1Id && r.person2Id === person2Id) ||
+      (r.person1Id === person2Id && r.person2Id === person1Id)
+  )
 }
 
 export function initializeWithSampleData(): void {

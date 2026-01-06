@@ -3,7 +3,7 @@
 import { useRef, useCallback, useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import type { Person, Relationship } from "@/lib/types"
-import { RELATIONSHIP_TYPES } from "@/lib/types"
+import { RELATIONSHIP_TYPES, type NetworkEvent } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -28,17 +28,21 @@ interface GraphNode {
   id: string
   name: string
   avatar?: string
+  isEvent?: boolean
+  eventType?: "positive" | "negative" | "neutral"
 }
 
 interface GraphLink {
-  source: string
-  target: string
-  relationshipId: string
+  source?: string | any
+  target?: string | any
+  relationshipId?: string
+  isEventLink?: boolean
 }
 
 interface NetworkGraphProps {
   people: Person[]
   relationships: Relationship[]
+  networkEvents: NetworkEvent[]
   selectedPersonId: string | null
   selectedRelationshipId: string | null
   showLinks: boolean
@@ -50,6 +54,7 @@ interface NetworkGraphProps {
 export function NetworkGraph({
   people,
   relationships,
+  networkEvents,
   selectedPersonId,
   selectedRelationshipId,
   showLinks,
@@ -112,20 +117,42 @@ export function NetworkGraph({
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] })
 
   useEffect(() => {
-    const nodes: GraphNode[] = people.map((person) => ({
+    const personNodes: GraphNode[] = people.map((person) => ({
       id: person.id,
       name: person.name,
       avatar: person.avatar,
+      isEvent: false
     }))
 
-    const links: GraphLink[] = relationships.map((rel) => ({
+    const eventNodes: GraphNode[] = networkEvents.map((event) => ({
+      id: `event-${event.id}`,
+      name: event.category,
+      isEvent: true,
+      eventType: event.type
+    }))
+
+    const relLinks: GraphLink[] = relationships.map((rel) => ({
       source: rel.person1Id,
       target: rel.person2Id,
       relationshipId: rel.id,
     }))
 
-    setGraphData({ nodes, links })
-  }, [people, relationships])
+    const eventLinks: GraphLink[] = []
+    networkEvents.forEach(event => {
+      event.participants.forEach(pId => {
+        eventLinks.push({
+          source: `event-${event.id}`,
+          target: pId,
+          isEventLink: true
+        })
+      })
+    })
+
+    setGraphData({
+      nodes: [...personNodes, ...eventNodes],
+      links: [...relLinks, ...eventLinks]
+    })
+  }, [people, relationships, networkEvents])
 
   useEffect(() => {
     people.forEach((person) => {
@@ -148,14 +175,16 @@ export function NetworkGraph({
   )
 
   const isNodeSelected = useCallback(
-    (nodeId: string) => {
-      return selectedPersonId === nodeId
+    (node: GraphNode) => {
+      return selectedPersonId === node.id || (node.isEvent && selectedRelationshipId === node.id.replace('event-', ''))
     },
-    [selectedPersonId],
+    [selectedPersonId, selectedRelationshipId],
   )
 
   const getLinkColor = useCallback(
-    (relationshipId: string) => {
+    (link: GraphLink) => {
+      if (link.isEventLink) return "rgba(129, 140, 248, 0.2)"
+      const relationshipId = link.relationshipId
       const rel = relationships.find((r) => r.id === relationshipId)
       if (!rel) return "#64748b"
       if (selectedRelationshipId === relationshipId) return "#6495ed"
@@ -165,8 +194,9 @@ export function NetworkGraph({
   )
 
   const getLinkWidth = useCallback(
-    (relationshipId: string) => {
-      return selectedRelationshipId === relationshipId ? 8 : 4
+    (link: GraphLink) => {
+      if (link.isEventLink) return 1
+      return selectedRelationshipId === link.relationshipId ? 8 : 4
     },
     [selectedRelationshipId],
   )
@@ -254,7 +284,43 @@ export function NetworkGraph({
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       if (node.x === undefined || node.y === undefined) return
 
-      const selected = isNodeSelected(node.id)
+      const selected = isNodeSelected(node)
+
+      if (node.isEvent) {
+        // Render Event Node as a Diamond
+        const size = selected ? 10 : 8
+        const color = node.eventType === "positive" ? "#4ade80" : node.eventType === "negative" ? "#f87171" : "#818cf8"
+
+        ctx.save()
+        ctx.translate(node.x, node.y)
+        ctx.rotate(Math.PI / 4)
+
+        // Glow for event
+        ctx.beginPath()
+        ctx.rect(-size / 2 - 2, -size / 2 - 2, size + 4, size + 4)
+        ctx.fillStyle = node.eventType === "positive" ? "rgba(74, 222, 128, 0.1)" : "rgba(129, 140, 248, 0.1)"
+        ctx.fill()
+
+        ctx.beginPath()
+        ctx.rect(-size / 2, -size / 2, size, size)
+        ctx.fillStyle = color
+        ctx.fill()
+        ctx.strokeStyle = "rgba(255,255,255,0.8)"
+        ctx.lineWidth = selected ? 2 : 1
+        ctx.stroke()
+        ctx.restore()
+
+        if (selected || globalScale > 1.5) {
+          const fontSize = 10 / globalScale
+          ctx.font = `${fontSize}px Inter, sans-serif`
+          ctx.textAlign = "center"
+          ctx.textBaseline = "top"
+          ctx.fillStyle = "#94a3b8"
+          ctx.fillText(node.name, node.x, node.y + size + 2)
+        }
+        return
+      }
+
       const nodeRadius = selected ? 16 : 12
       const fontSize = 12 / globalScale
       const label = node.name
@@ -302,12 +368,11 @@ export function NetworkGraph({
   // Filter links based on selection: if a node is selected, show only its links
   const visibleLinks = showLinks
     ? selectedPersonId
-      ? graphData.links.filter(link =>
-        link.source === selectedPersonId ||
-        link.target === selectedPersonId ||
-        (typeof link.source === 'object' && (link.source as any).id === selectedPersonId) ||
-        (typeof link.target === 'object' && (link.target as any).id === selectedPersonId)
-      )
+      ? graphData.links.filter(link => {
+        const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source
+        const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target
+        return sourceId === selectedPersonId || targetId === selectedPersonId
+      })
       : graphData.links
     : []
 
@@ -339,11 +404,20 @@ export function NetworkGraph({
             ctx.arc(node.x, node.y, 12, 0, 2 * Math.PI)
             ctx.fill()
           }}
-          linkColor={(link: any) => getLinkColor(link.relationshipId)}
-          linkWidth={(link: any) => getLinkWidth(link.relationshipId)}
+          linkColor={getLinkColor}
+          linkWidth={getLinkWidth}
           linkHoverPrecision={10}
-          linkDirectionalParticles={0}
-          onNodeClick={handleNodeClickForRelationship}
+          linkDirectionalParticles={(link: any) => link.isEventLink ? 2 : 0}
+          linkDirectionalParticleSpeed={0.01}
+          linkDirectionalParticleWidth={2}
+          onNodeClick={(node: any) => {
+            if (node.isEvent) {
+              onSelectPerson(null)
+              onSelectRelationship(node.id.replace('event-', ''))
+            } else {
+              handleNodeClickForRelationship(node)
+            }
+          }}
           onNodeRightClick={handleNodeRightClick}
           onLinkClick={handleLinkClick}
           onBackgroundClick={handleBackgroundClick}

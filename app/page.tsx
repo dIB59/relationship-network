@@ -6,16 +6,21 @@ import { PersonDetailPanel } from "@/components/person-detail-panel"
 import { RelationshipDetailPanel } from "@/components/relationship-detail-panel"
 import { AddPersonDialog } from "@/components/add-person-dialog"
 import { AddRelationshipDialog } from "@/components/add-relationship-dialog"
-import type { Person, Relationship, RelationshipEvent } from "@/lib/types"
+import { AddNetworkEventDialog } from "@/components/add-network-event-dialog"
+import type { Person, Relationship, RelationshipEvent, NetworkEvent } from "@/lib/types"
 import {
   getPeople,
   getRelationships,
+  getNetworkEvents,
   addPerson,
   addRelationship,
   addEventToRelationship,
+  addNetworkEvent,
   deleteRelationship,
   deletePerson,
   getRelationshipsForPerson,
+  getEventsForPerson,
+  getEventsForRelationship,
   initializeWithSampleData,
 } from "@/lib/store"
 import { Users, Link2, Link2Off } from "lucide-react"
@@ -25,6 +30,7 @@ import { Label } from "@/components/ui/label"
 export default function RelationshipNetworkApp() {
   const [people, setPeople] = useState<Person[]>([])
   const [relationships, setRelationships] = useState<Relationship[]>([])
+  const [networkEvents, setNetworkEvents] = useState<NetworkEvent[]>([])
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null)
   const [showLinks, setShowLinks] = useState(true)
@@ -33,6 +39,7 @@ export default function RelationshipNetworkApp() {
     initializeWithSampleData()
     setPeople(getPeople())
     setRelationships(getRelationships())
+    setNetworkEvents(getNetworkEvents())
   }, [])
 
   const handleAddPerson = useCallback((name: string, avatar?: string) => {
@@ -69,6 +76,16 @@ export default function RelationshipNetworkApp() {
     setRelationships(getRelationships())
   }, [])
 
+  const handleAddNetworkEvent = useCallback((event: Omit<NetworkEvent, "id">) => {
+    const newEvent: NetworkEvent = {
+      ...event,
+      id: Date.now().toString(),
+    }
+    addNetworkEvent(newEvent)
+    setNetworkEvents(getNetworkEvents())
+    setRelationships(getRelationships()) // Refresh to show updated health scores
+  }, [])
+
   const handleDeleteRelationship = useCallback((id: string) => {
     deleteRelationship(id)
     setRelationships(getRelationships())
@@ -96,6 +113,7 @@ export default function RelationshipNetworkApp() {
 
   const selectedPerson = people.find((p) => p.id === selectedPersonId)
   const selectedPersonRelationships = selectedPersonId ? getRelationshipsForPerson(selectedPersonId) : []
+  const selectedPersonEvents = selectedPersonId ? getEventsForPerson(selectedPersonId) : []
   const selectedRelationship = relationships.find((r) => r.id === selectedRelationshipId)
 
   console.log(
@@ -135,6 +153,7 @@ export default function RelationshipNetworkApp() {
             <div className="h-6 w-px bg-border" />
             <AddPersonDialog onAddPerson={handleAddPerson} />
             <AddRelationshipDialog people={people} onAddRelationship={handleAddRelationship} />
+            <AddNetworkEventDialog people={people} relationships={relationships} onAddEvent={handleAddNetworkEvent} />
           </div>
         </div>
       </header>
@@ -147,6 +166,7 @@ export default function RelationshipNetworkApp() {
             <NetworkGraph
               people={people}
               relationships={relationships}
+              networkEvents={networkEvents}
               selectedPersonId={selectedPersonId}
               selectedRelationshipId={selectedRelationshipId}
               showLinks={showLinks}
@@ -163,6 +183,7 @@ export default function RelationshipNetworkApp() {
               person={selectedPerson}
               people={people}
               relationships={selectedPersonRelationships}
+              networkEvents={selectedPersonEvents}
               onClose={() => setSelectedPersonId(null)}
               onAddEvent={handleAddEvent}
               onDeleteRelationship={handleDeleteRelationship}
@@ -176,6 +197,7 @@ export default function RelationshipNetworkApp() {
             <RelationshipDetailPanel
               relationship={selectedRelationship}
               people={people}
+              networkEvents={getEventsForRelationship(selectedRelationshipId!)}
               onClose={() => setSelectedRelationshipId(null)}
               onAddEvent={handleAddEvent}
               onDeleteRelationship={handleDeleteRelationship}

@@ -6,6 +6,27 @@ export interface Person {
   y: number
 }
 
+// New: Network-wide events that can involve multiple people
+export interface NetworkEvent {
+  id: string
+  type: "positive" | "negative" | "neutral"
+  category: string
+  description: string
+  date: string
+  image?: string // optional image for the event
+
+  // Multi-person support
+  participants: string[] // Array of person IDs involved in this event
+
+  // Ripple effects - how this event affects various relationships
+  impacts: {
+    relationshipId: string  // Which relationship is affected
+    impact: number          // -10 to +10
+    reason?: string         // Optional explanation of why this relationship was affected
+  }[]
+}
+
+// Legacy: Relationship-specific events (for backward compatibility)
 export interface RelationshipEvent {
   id: string
   type: "positive" | "negative" | "neutral"
@@ -23,7 +44,7 @@ export interface Relationship {
   person2Id: string
   type: string // e.g., "marriage", "friendship", "family", "colleague"
   healthScore: number // -100 to 100
-  events: RelationshipEvent[]
+  events: RelationshipEvent[] // Keep for backward compatibility
 }
 
 export type EventCategory = {
