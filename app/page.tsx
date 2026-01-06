@@ -54,7 +54,7 @@ export default function RelationshipNetworkApp() {
     setPeople(getPeople())
   }, [])
 
-  const handleAddRelationship = useCallback((person1Id: string, person2Id: string, type: string) => {
+  const handleAddRelationship = useCallback((person1Id: string, person2Id: string, type: string, extra?: Partial<Relationship>) => {
     const newRelationship: Relationship = {
       id: Date.now().toString(),
       person1Id,
@@ -62,6 +62,7 @@ export default function RelationshipNetworkApp() {
       type,
       healthScore: 50,
       events: [],
+      ...extra,
     }
     addRelationship(newRelationship)
     setRelationships(getRelationships())

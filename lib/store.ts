@@ -61,6 +61,10 @@ export function getRelationshipsForPerson(personId: string): Relationship[] {
   return relationships.filter((r) => r.person1Id === personId || r.person2Id === personId)
 }
 
+export function updateRelationship(id: string, updates: Partial<Relationship>): void {
+  relationships = relationships.map((r) => (r.id === id ? { ...r, ...updates } : r))
+}
+
 // Network event management
 export function addNetworkEvent(event: NetworkEvent): void {
   networkEvents = [...networkEvents, event]
@@ -219,6 +223,18 @@ export function initializeWithSampleData(): void {
           date: "2025-11-15",
         },
       ],
+    },
+    {
+      id: "r5",
+      person1Id: "1", // Alex
+      person2Id: "4", // Casey
+      type: "Acquaintance",
+      healthScore: 40,
+      p1ToP2Type: "Crush",
+      p1ToP2Health: 85,
+      p2ToP1Type: "Acquaintance",
+      p2ToP1Health: 40,
+      events: [],
     },
   ]
 }

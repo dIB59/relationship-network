@@ -45,6 +45,12 @@ export interface Relationship {
   type: string // e.g., "marriage", "friendship", "family", "colleague"
   healthScore: number // -100 to 100
   events: RelationshipEvent[] // Keep for backward compatibility
+
+  // Directional perspectives (optional)
+  p1ToP2Type?: string   // How Person 1 views Person 2
+  p2ToP1Type?: string   // How Person 2 views Person 1
+  p1ToP2Health?: number // Person 1's health/feeling score towards Person 2
+  p2ToP1Health?: number // Person 2's health/feeling score towards Person 1
 }
 
 export type EventCategory = {

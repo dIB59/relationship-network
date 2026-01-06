@@ -122,29 +122,93 @@ export function RelationshipDetailPanel({
               </div>
             </div>
 
-            {/* Health score */}
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-secondary/50">
-              {getHealthIcon(relationship.healthScore)}
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium">{getHealthLabel(relationship.healthScore)}</span>
-                  <span className="text-sm text-muted-foreground">{relationship.healthScore}%</span>
+            {/* Health score and Perspectives */}
+            <div className="space-y-3">
+              {/* Mutual Health (Default) */}
+              {!relationship.p1ToP2Type && !relationship.p2ToP1Type && (
+                <div className="flex items-center gap-2 p-4 rounded-lg bg-secondary/50">
+                  {getHealthIcon(relationship.healthScore)}
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium">Mutual Health: {getHealthLabel(relationship.healthScore)}</span>
+                      <span className="text-sm text-muted-foreground">{relationship.healthScore}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max(0, (relationship.healthScore + 100) / 2)}%`,
+                          backgroundColor:
+                            relationship.healthScore >= 20
+                              ? "#4ade80"
+                              : relationship.healthScore <= -20
+                                ? "#f87171"
+                                : "#94a3b8",
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-500"
-                    style={{
-                      width: `${Math.max(0, (relationship.healthScore + 100) / 2)}%`,
-                      backgroundColor:
-                        relationship.healthScore >= 20
-                          ? "#4ade80"
-                          : relationship.healthScore <= -20
-                            ? "#f87171"
-                            : "#94a3b8",
-                    }}
-                  />
+              )}
+
+              {/* Asymmetric Perspectives */}
+              {(relationship.p1ToP2Type || relationship.p2ToP1Type) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Person 1 to Person 2 */}
+                  <div className="p-3 rounded-lg bg-secondary/40 border border-border/50">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">
+                      {person1.name} → {person2.name}
+                    </div>
+                    <div className="mb-2">
+                      <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-300">
+                        {relationship.p1ToP2Type || relationship.type}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-medium">
+                        <span>{getHealthLabel(relationship.p1ToP2Health ?? relationship.healthScore)}</span>
+                        <span>{relationship.p1ToP2Health ?? relationship.healthScore}%</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full transition-all duration-500"
+                          style={{
+                            width: `${Math.max(0, ((relationship.p1ToP2Health ?? relationship.healthScore) + 100) / 2)}%`,
+                            backgroundColor: (relationship.p1ToP2Health ?? relationship.healthScore) >= 20 ? "#4ade80" : (relationship.p1ToP2Health ?? relationship.healthScore) <= -20 ? "#f87171" : "#94a3b8",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Person 2 to Person 1 */}
+                  <div className="p-3 rounded-lg bg-secondary/40 border border-border/50">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">
+                      {person2.name} → {person1.name}
+                    </div>
+                    <div className="mb-2">
+                      <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-300">
+                        {relationship.p2ToP1Type || relationship.type}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-medium">
+                        <span>{getHealthLabel(relationship.p2ToP1Health ?? relationship.healthScore)}</span>
+                        <span>{relationship.p2ToP1Health ?? relationship.healthScore}%</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full transition-all duration-500"
+                          style={{
+                            width: `${Math.max(0, ((relationship.p2ToP1Health ?? relationship.healthScore) + 100) / 2)}%`,
+                            backgroundColor: (relationship.p2ToP1Health ?? relationship.healthScore) >= 20 ? "#4ade80" : (relationship.p2ToP1Health ?? relationship.healthScore) <= -20 ? "#f87171" : "#94a3b8",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Events header */}
@@ -165,10 +229,10 @@ export function RelationshipDetailPanel({
                       <div className="flex items-center gap-2">
                         <span
                           className={`w-2 h-2 rounded-full ${event.type === "positive"
-                              ? "bg-green-400"
-                              : event.type === "negative"
-                                ? "bg-red-400"
-                                : "bg-slate-400"
+                            ? "bg-green-400"
+                            : event.type === "negative"
+                              ? "bg-red-400"
+                              : "bg-slate-400"
                             }`}
                         />
                         <span className="text-sm font-medium">{event.category}</span>
